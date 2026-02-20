@@ -80,11 +80,11 @@ DBC      *geo_dbc  = NULL;                     /* GeoDB database cursor    */
 
 struct   dns_child child[MAXCHILD];            /* DNS child pipe data      */
 
-DNODEPTR host_table[MAXHASH];                  /* hostname/ip hash table   */
+DNODEPTR host_table_dns[MAXHASH];              /* hostname/ip hash table   */
 
-char     buffer[BUFSIZE];                      /* log file record buffer   */
-char     tmp_buf[BUFSIZE];                     /* used to temp save above  */
-struct   utsname system_info;                  /* system info structure    */
+char     buffer_dns[BUFSIZE];                  /* log file record buffer   */
+char     tmp_buf_dns[BUFSIZE];                 /* used to temp save above  */
+struct   utsname system_info_dns;              /* system info structure    */
 
 int      raiseSigChild = 1;
 
@@ -230,22 +230,22 @@ int dns_resolver(void *log_fp)
    verbose=0;
 
    /* Main loop to read log records (either regular or zipped) */
-   while ( ourget(buffer,BUFSIZE,our_fp) != NULL)
+   while ( ourget(buffer_dns,BUFSIZE,our_fp) != NULL)
    {
-	  int len = strlen(buffer);
+	  int len = strlen(buffer_dns);
       if (len == (BUFSIZE-1))
       {
          /* get the rest of the record */
-         while ( ourget(buffer,BUFSIZE,our_fp) != NULL)
+         while ( ourget(buffer_dns,BUFSIZE,our_fp) != NULL)
          {
-		 	len = strlen(buffer);
+		 	len = strlen(buffer_dns);
             if (len < BUFSIZE-1) break;
          }
          continue;                        /* go get next record if any    */
       }
 
-      strcpy(tmp_buf, buffer);            /* save buffer in case of error */
-      if(parse_record(buffer, len))       /* parse the record             */
+      strcpy(tmp_buf_dns, buffer_dns);            /* save buffer in case of error */
+      if(parse_record(buffer_dns, len))       /* parse the record             */
       {
          struct addrinfo hints, *ares;
          memset(&hints, 0, sizeof(hints));
@@ -269,13 +269,13 @@ int dns_resolver(void *log_fp)
                   /* If it's not permanent, check if it's TTL has expired */
                   if ( (runtime-alignedRecord.timeStamp ) > (86400*cache_ttl) )
                      put_dnode(log_rec.hostname, log_rec.hnamelen, ares->ai_addr,
-                               ares->ai_addrlen,  host_table);
+                               ares->ai_addrlen,  host_table_dns);
             }
             else
             {
                if (i==DB_NOTFOUND)
                    put_dnode(log_rec.hostname, log_rec.hnamelen, ares->ai_addr,
-                             ares->ai_addrlen, host_table);
+                             ares->ai_addrlen, host_table_dns);
             }
             freeaddrinfo(ares);
          }
@@ -288,7 +288,7 @@ int dns_resolver(void *log_fp)
    /* build our linked list l_list  */
    for(i=0;i < MAXHASH; i++)
    {
-      for(h_entries=host_table[i]; h_entries ; h_entries = h_entries->next)
+      for(h_entries=host_table_dns[i]; h_entries ; h_entries = h_entries->next)
       {
          h_entries->llist = l_list;
          l_list = h_entries;

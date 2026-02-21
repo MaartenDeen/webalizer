@@ -68,8 +68,6 @@
 #include "parser.h"                            /* log parser functions     */
 #include "dns_resolv.h"                        /* our header               */
 
-extern void *our_fp;
-
 /* local data */
 
 DB       *dns_db   = NULL;                     /* DNS cache database       */
@@ -80,17 +78,19 @@ DBC      *geo_dbc  = NULL;                     /* GeoDB database cursor    */
 
 struct   dns_child child[MAXCHILD];            /* DNS child pipe data      */
 
-DNODEPTR host_table_dns[MAXHASH];              /* hostname/ip hash table   */
+DNODEPTR host_table[MAXHASH];                  /* hostname/ip hash table   */
 
-char     buffer_dns[BUFSIZE];                  /* log file record buffer   */
-char     tmp_buf_dns[BUFSIZE];                 /* used to temp save above  */
-struct   utsname system_info_dns;              /* system info structure    */
+char     buffer[BUFSIZE];                      /* log file record buffer   */
+char     tmp_buf[BUFSIZE];                     /* used to temp save above  */
+struct   utsname system_info;                  /* system info structure    */
 
 int      raiseSigChild = 1;
 
 time_t runtime;
 time_t start_time, end_time;
 float  temp_time;
+
+extern char *our_gzgets(void *, char *, int);  /* external our_gzgets func */
 
 /* internal function prototypes */
 
@@ -118,7 +118,7 @@ void resolve_dns(struct log_struct *log_rec)
    memset(&query, 0, sizeof(query));
    memset(&response, 0, sizeof(response));
    query.data = log_rec->hostname;
-   query.size = log_rec->hnamelen;
+   query.size = strlen(log_rec->hostname);
 
    if (debug_mode) fprintf(stderr,"Checking %s...", log_rec->hostname);
 
@@ -230,22 +230,22 @@ int dns_resolver(void *log_fp)
    verbose=0;
 
    /* Main loop to read log records (either regular or zipped) */
-   while ( ourget(buffer_dns,BUFSIZE,our_fp) != NULL)
+   while ( (gz_log)?(our_gzgets((void *)log_fp,buffer,BUFSIZE) != Z_NULL):
+           (fgets(buffer,BUFSIZE,log_fname?(FILE *)log_fp:stdin) != NULL))
    {
-	  int len = strlen(buffer_dns);
-      if (len == (BUFSIZE-1))
+      if (strlen(buffer) == (BUFSIZE-1))
       {
          /* get the rest of the record */
-         while ( ourget(buffer_dns,BUFSIZE,our_fp) != NULL)
+         while ( (gz_log)?(our_gzgets((void *)log_fp,buffer,BUFSIZE)!=Z_NULL):
+                 (fgets(buffer,BUFSIZE,log_fname?(FILE *)log_fp:stdin)!=NULL))
          {
-		 	len = strlen(buffer_dns);
-            if (len < BUFSIZE-1) break;
+            if (strlen(buffer) < BUFSIZE-1) break;
          }
          continue;                        /* go get next record if any    */
       }
 
-      strcpy(tmp_buf_dns, buffer_dns);            /* save buffer in case of error */
-      if(parse_record(buffer_dns, len))       /* parse the record             */
+      strcpy(tmp_buf, buffer);            /* save buffer in case of error */
+      if(parse_record(buffer))            /* parse the record             */
       {
          struct addrinfo hints, *ares;
          memset(&hints, 0, sizeof(hints));
@@ -258,7 +258,7 @@ int dns_resolver(void *log_fp)
             memset(&q, 0, sizeof(q));
             memset(&r, 0, sizeof(r));
             q.data = log_rec.hostname;
-            q.size = log_rec.hnamelen;
+            q.size = strlen(log_rec.hostname);
 
             /* Check if we have it in DB */
             if ( (i=dns_db->get(dns_db, NULL, &q, &r, 0)) == 0 )
@@ -268,14 +268,14 @@ int dns_resolver(void *log_fp)
                if (alignedRecord.timeStamp != 0)
                   /* If it's not permanent, check if it's TTL has expired */
                   if ( (runtime-alignedRecord.timeStamp ) > (86400*cache_ttl) )
-                     put_dnode(log_rec.hostname, log_rec.hnamelen, ares->ai_addr,
-                               ares->ai_addrlen,  host_table_dns);
+                     put_dnode(log_rec.hostname, ares->ai_addr,
+                               ares->ai_addrlen,  host_table);
             }
             else
             {
                if (i==DB_NOTFOUND)
-                   put_dnode(log_rec.hostname, log_rec.hnamelen, ares->ai_addr,
-                             ares->ai_addrlen, host_table_dns);
+                   put_dnode(log_rec.hostname, ares->ai_addr,
+                             ares->ai_addrlen, host_table);
             }
             freeaddrinfo(ares);
          }
@@ -288,7 +288,7 @@ int dns_resolver(void *log_fp)
    /* build our linked list l_list  */
    for(i=0;i < MAXHASH; i++)
    {
-      for(h_entries=host_table_dns[i]; h_entries ; h_entries = h_entries->next)
+      for(h_entries=host_table[i]; h_entries ; h_entries = h_entries->next)
       {
          h_entries->llist = l_list;
          l_list = h_entries;
@@ -413,16 +413,14 @@ static void process_list(DNODEPTR l_list)
                   if(0 == getnameinfo((struct sockaddr*)child_buf, size,
                                      hbuf, sizeof(hbuf), NULL, 0, NI_NAMEREQD))
                   {
-				  	 size = strlen(hbuf);
                      /* must be at least 4 chars */
-                     if (size>3)
+                     if (strlen(hbuf)>3)
                      {
                         /* If long hostname, take max domain name part */
-                        if (size > MAXHOST-2) {
+                        if ((size = strlen(hbuf)) > MAXHOST-2)
                            strcpy(child_buf,(hbuf+(size-MAXHOST+1)));
-						   size = size - (size-MAXHOST+1);
-						}
                         else strcpy(child_buf, hbuf);
+                        size = strlen(child_buf);
                      }
                      else
                      {

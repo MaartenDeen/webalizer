@@ -60,7 +60,7 @@ void     del_nlist(NLISTPTR *);                     /* del list            */
 GLISTPTR new_glist(char *, char *);                 /* new group list node */
 void     del_glist(GLISTPTR *);                     /* del group list      */
 
-int      isinstr(char *, int, char *, int);
+int      isinstr(char *, char *);
 
 /* Linkded list pointers */
 GLISTPTR group_sites   = NULL;                /* "group" lists            */
@@ -102,18 +102,14 @@ GLISTPTR search_list   = NULL;                /* Search engine list       */
 NLISTPTR new_nlist(char *str)
 {
    NLISTPTR newptr;
-   int len = strlen(str);
 
-   if (sizeof(newptr->string) < len)
+   if (sizeof(newptr->string) < strlen(str))
    {
       if (verbose)
     fprintf(stderr,"[new_nlist] %s\n",msg_big_one);
    }
-   if (( newptr = malloc(sizeof(struct nlist))) != NULL) {
-    strncpy(newptr->string, str, sizeof(newptr->string));
-	newptr->next=NULL;
-	newptr->len = len;
-   }
+   if (( newptr = malloc(sizeof(struct nlist))) != NULL)
+    {strncpy(newptr->string, str, sizeof(newptr->string));newptr->next=NULL;}
    return newptr;
 }
 
@@ -162,12 +158,9 @@ void del_nlist(NLISTPTR *list)
 GLISTPTR new_glist(char *str, char *name)
 {
    GLISTPTR newptr;
-   int slen, nlen;
 
-   slen = strlen(str);
-   nlen = strlen(name);
-   if (sizeof(newptr->string) < slen ||
-       sizeof(newptr->name) < nlen)
+   if (sizeof(newptr->string) < strlen(str) ||
+       sizeof(newptr->name) < strlen(name))
    {
       if (verbose)
 	fprintf(stderr,"[new_glist] %s\n",msg_big_one);
@@ -177,7 +170,6 @@ GLISTPTR new_glist(char *str, char *name)
        strncpy(newptr->string, str, sizeof(newptr->string));
        strncpy(newptr->name, name, sizeof(newptr->name));
        newptr->next=NULL;
-	   newptr->nlen = nlen;
      }
    return newptr;
 }
@@ -245,14 +237,14 @@ void del_glist(GLISTPTR *list)
 /* ISINLIST - Test if string is in list      */
 /*********************************************/
 
-char *isinlist(NLISTPTR list, char *str, int slen)
+char *isinlist(NLISTPTR list, char *str)
 {
    NLISTPTR lptr;
 
    lptr=list;
    while (lptr!=NULL)
    {
-      if (isinstr(str,slen,lptr->string,lptr->len)) return lptr->string;
+      if (isinstr(str,lptr->string)) return lptr->string;
       lptr=lptr->next;
    }
    return NULL;
@@ -262,17 +254,14 @@ char *isinlist(NLISTPTR list, char *str, int slen)
 /* ISINGLIST - Test if string is in list     */
 /*********************************************/
 
-char *isinglist(GLISTPTR list, char *str, int *len)
+char *isinglist(GLISTPTR list, char *str)
 {
    GLISTPTR lptr;
 
    lptr=list;
    while (lptr!=NULL)
    {
-      if (isinstr(str,*len,lptr->string,lptr->len)) {
-	    *len = lptr->nlen;
-	    return lptr->name;
-	  }
+      if (isinstr(str,lptr->string)) return lptr->name;
       lptr=lptr->next;
    }
    return NULL;
@@ -282,15 +271,15 @@ char *isinglist(GLISTPTR list, char *str, int *len)
 /* ISINSTR - Scan for string in string       */
 /*********************************************/
 
-int isinstr(char *str, int slen, char *cp, int clen)
+int isinstr(char *str, char *cp)
 {
    char *cp1,*cp2;
 
-   cp1=cp+clen-1;
+   cp1=(cp+strlen(cp))-1;
    if (*cp=='*')
    {
       /* if leading wildcard, start from end */
-      cp2=str+slen-1;
+      cp2=str+strlen(str)-1;
       while ( (cp1!=cp) && (cp2!=str))
       {
          if (*cp1=='*') return 1;

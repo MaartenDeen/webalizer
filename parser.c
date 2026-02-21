@@ -54,18 +54,10 @@
 
 /* internal function prototypes */
 void fmt_logrec(char *);
-int  parse_record_clf(char *, int);
-int  parse_record_ftp(char *, int);
-int  parse_record_squid(char *, int);
-int  parse_record_w3c(char *, int);
-
-char *strncopy(char *a, const char *b, size_t n)
-{
-	if (!a || !b || !n)
-		return a;
-	while ((*a++ = *b++) && n-- > 0) ;
-	return a-1;
-}
+int  parse_record_clf(char *);
+int  parse_record_ftp(char *);
+int  parse_record_squid(char *);
+int  parse_record_w3c(char *);
 
 /*********************************************/
 /* FMT_LOGREC - terminate log fields w/zeros */
@@ -97,7 +89,7 @@ void fmt_logrec(char *buffer)
 /* PARSE_RECORD - uhhh, you know...          */
 /*********************************************/
 
-int parse_record(char *buffer, int len)
+int parse_record(char *buffer)
 {
    /* clear out structure */
    memset(&log_rec,0,sizeof(struct log_struct));
@@ -106,10 +98,10 @@ int parse_record(char *buffer, int len)
    switch (log_type)
    {
       default:
-      case LOG_CLF:   return parse_record_clf(buffer,len);   break; /* clf   */
-      case LOG_FTP:   return parse_record_ftp(buffer,len);   break; /* ftp   */
-      case LOG_SQUID: return parse_record_squid(buffer,len); break; /* squid */
-      case LOG_W3C:   return parse_record_w3c(buffer,len);   break; /* w3c   */
+      case LOG_CLF:   return parse_record_clf(buffer);   break; /* clf   */
+      case LOG_FTP:   return parse_record_ftp(buffer);   break; /* ftp   */
+      case LOG_SQUID: return parse_record_squid(buffer); break; /* squid */
+      case LOG_W3C:   return parse_record_w3c(buffer);   break; /* w3c   */
    }
 }
 
@@ -117,11 +109,13 @@ int parse_record(char *buffer, int len)
 /* PARSE_RECORD_FTP - ftp log handler        */
 /*********************************************/
 
-int parse_record_ftp(char *buffer,int size)
+int parse_record_ftp(char *buffer)
 {
+   int size;
    int i,j,count;
-   char *cp1, *cp2, *cpx, *cpy, *eob, *et;
+   char *cp1, *cp2, *cpx, *cpy, *eob;
 
+   size = strlen(buffer);                 /* get length of buffer        */
    eob = buffer+size;                     /* calculate end of buffer     */
    fmt_logrec(buffer);                    /* separate fields with \0's   */
 
@@ -159,16 +153,13 @@ int parse_record_ftp(char *buffer,int size)
    {
       /* Blank? That's weird.. */
       strcpy(log_rec.hostname,"NONE");
-	  log_rec.hnamelen = sizeof("NONE")-1;
       if (debug_mode) fprintf(stderr, "Warning: Blank hostname found!\n");
    }
    else
    {
       /* good hostname */
-      et = strncopy(log_rec.hostname, ++cp1, MAXHOST);
-	  *et = 0;
-	  log_rec.hnamelen = et - cp1;
-	  cp1 = et+1;
+      strncpy(log_rec.hostname, ++cp1, MAXHOST);
+      log_rec.hostname[MAXHOST-1]=0;
       while (*cp1!=0 && cp1<eob) cp1++;
    }
    while (*cp1==0 && cp1<eob) cp1++;
@@ -193,9 +184,9 @@ int parse_record_ftp(char *buffer,int size)
 
    /* fabricate an appropriate request string based on direction */
    if (*cp1=='i')
-      log_rec.urllen = snprintf(log_rec.url,sizeof(log_rec.url),"\"POST %s\"",cpx);
+      snprintf(log_rec.url,sizeof(log_rec.url),"\"POST %s\"",cpx);
    else
-      log_rec.urllen = snprintf(log_rec.url,sizeof(log_rec.url),"\"GET %s\"",cpx);
+      snprintf(log_rec.url,sizeof(log_rec.url),"\"GET %s\"",cpx);
 
    if (cp1<eob) cp1++;
    if (cp1<eob) cp1++;
@@ -204,7 +195,6 @@ int parse_record_ftp(char *buffer,int size)
    cp2=log_rec.ident;count=MAXIDENT-1;
    while (*cp1!=0 && cp1<eob && count) { *cp2++ = *cp1++; count--; }
    *cp2='\0';
-   log_rec.identlen = cp2 - log_rec.ident;
 
    /* return appropriate response code */
    log_rec.resp_code=(*(eob-2)=='i')?206:200;
@@ -216,10 +206,12 @@ int parse_record_ftp(char *buffer,int size)
 /* PARSE_RECORD_CLF - CLF web log handler    */
 /*********************************************/
 
-int parse_record_clf(char *buffer, int size)
+int parse_record_clf(char *buffer)
 {
+   int size;
    char *cp1, *cp2, *cpx, *eob, *eos;
 
+   size = strlen(buffer);                 /* get length of buffer        */
    eob = buffer+size;                     /* calculate end of buffer     */
    fmt_logrec(buffer);                    /* separate fields with \0's   */
 
@@ -230,7 +222,6 @@ int parse_record_clf(char *buffer, int size)
 
    while ( (*cp1 != '\0') && (cp1 != eos) ) *cp2++ = *cp1++;
    *cp2 = '\0';
-   log_rec.hnamelen = cp2 - log_rec.hostname;
    if (*cp1 != '\0')
    {
       if (verbose)
@@ -259,7 +250,6 @@ int parse_record_clf(char *buffer, int size)
       *cp2++=*cp1++;
    }
    *cp2--='\0';
-   log_rec.identlen = cp2 - log_rec.ident;
 
    if (cp1 >= eob) return 0;
 
@@ -308,12 +298,9 @@ int parse_record_clf(char *buffer, int size)
    cp2 = log_rec.url;
    eos = (cp1+MAXURL-1);
    if (eos >= eob) eos = eob-1;
-   cp2 = strncopy(cp2, cp1, MAXURL);
-   *cp2 = '\0';
-   log_rec.urllen = cp2 - log_rec.url;
-   cp1 += log_rec.urllen;
 
-   while ( (*cp1 != '\0') && (cp1 != eos) ) cp1++;
+   while ( (*cp1 != '\0') && (cp1 != eos) ) *cp2++ = *cp1++;
+   *cp2 = '\0';
    if (*cp1 != '\0')
    {
       if (verbose)
@@ -333,7 +320,6 @@ int parse_record_clf(char *buffer, int size)
    if ( (cp2=strstr(log_rec.url,"HTTP"))!=NULL )
    {
       *cp2='\0';          /* Terminate string */
-	  log_rec.urllen = cp2 - log_rec.url;
       *(--cp2)='"';       /* change <sp> to " */
    }
 
@@ -359,7 +345,6 @@ int parse_record_clf(char *buffer, int size)
 
    while ( (*cp1 != '\0') && (*cp1 != '\n') && (cp1 != eos) ) *cp2++ = *cp1++;
    *cp2 = '\0';
-   log_rec.referlen = cp2 - log_rec.refer;
    if (*cp1 != '\0')
    {
       if (verbose)
@@ -379,7 +364,6 @@ int parse_record_clf(char *buffer, int size)
 
    while ( (*cp1 != '\0') && (cp1 != eos) ) *cp2++ = *cp1++;
    *cp2 = '\0';
-   log_rec.agentlen = cp2 - log_rec.agent;
 
    return 1;     /* maybe a valid record, return with TRUE */
 }
@@ -388,12 +372,13 @@ int parse_record_clf(char *buffer, int size)
 /* PARSE_RECORD_SQUID - squid log handler    */
 /*********************************************/
 
-int parse_record_squid(char *buffer,int size)
+int parse_record_squid(char *buffer)
 {
-   int slash_count=0;
+   int size, slash_count=0;
    time_t i;
    char *cp1, *cp2, *cpx, *eob, *eos;
 
+   size = strlen(buffer);                 /* get length of buffer        */
    eob = buffer+size;                     /* calculate end of buffer     */
    fmt_logrec(buffer);                    /* separate fields with \0's   */
 
@@ -557,8 +542,9 @@ struct  fields_struct
    char *agent;    /* User agent field */
 };
 
-int parse_record_w3c(char *buffer,int size)
+int parse_record_w3c(char *buffer)
 {
+   int size;
    char *eob;
    char *cp;
    int index;
@@ -568,6 +554,7 @@ int parse_record_w3c(char *buffer,int size)
    time_t timestamp;
 
    memset(&gm_time, 0, sizeof(struct tm));
+   size = strlen(buffer);                 /* get length of buffer        */
    eob = buffer + size;                   /* calculate end of buffer     */
 
    /* remove line end markers, reduce eob accordingly */

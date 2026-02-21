@@ -60,20 +60,20 @@
 
 /* internal function prototypes */
 
-HNODEPTR new_hnode(char *,int);               /* new host node            */
-UNODEPTR new_unode(char *,int);               /* new url node             */
-RNODEPTR new_rnode(char *,int);               /* new referrer node        */
-ANODEPTR new_anode(char *,int);               /* new user agent node      */
-SNODEPTR new_snode(char *,int);               /* new search string..      */
-INODEPTR new_inode(char *,int);               /* new ident node           */
+HNODEPTR new_hnode(char *);                   /* new host node            */
+UNODEPTR new_unode(char *);                   /* new url node             */
+RNODEPTR new_rnode(char *);                   /* new referrer node        */
+ANODEPTR new_anode(char *);                   /* new user agent node      */
+SNODEPTR new_snode(char *);                   /* new search string..      */
+INODEPTR new_inode(char *);                   /* new ident node           */
 #ifdef USE_DNS
-DNODEPTR new_dnode(char *,int);               /* new DNS node             */
+DNODEPTR new_dnode(char *);                   /* new DNS node             */
 #endif  /* USE_DNS */
 
-void     update_entry(char *,int);            /* update entry/exit        */
-void     update_exit(char *,int);             /* page totals              */
+void     update_entry(char *);                /* update entry/exit        */
+void     update_exit(char *);                 /* page totals              */
 
-unsigned int hash(char *,int len);            /* hash function            */
+unsigned int hash(char *);                    /* hash function            */
 
 /* local data */
 
@@ -110,33 +110,34 @@ void del_htabs()
 /* NEW_HNODE - create host node              */
 /*********************************************/
 
-HNODEPTR new_hnode(char *str, int len)
+HNODEPTR new_hnode(char *str)
 {
    HNODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXHOST)
+   if (strlen(str) >= MAXHOST)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_hnode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_hnode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXHOST-1]=0;
-	  len=MAXHOST-1;
    }
 
-   if (( newptr = malloc(sizeof(struct hnode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (HNODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct hnode))) != NULL)
    {
-      newptr->string    =(char *)(newptr+1);
-	  newptr->slen      =len;
+      newptr->string    =sptr;
       newptr->visit     =0;
       newptr->tstamp    =0;
       newptr->lasturl   =blank_str;
-      newptr->llen      =0;
-	  strcpy(newptr->string,str);
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -145,7 +146,6 @@ HNODEPTR new_hnode(char *str, int len)
 /*********************************************/
 
 int put_hnode( char      *str,  /* Hostname  */
-               int       len,   /* name len  */
                int       type,  /* obj type  */
                u_int64_t count, /* hit count */
                u_int64_t file,  /* File flag */
@@ -154,18 +154,17 @@ int put_hnode( char      *str,  /* Hostname  */
                u_int64_t visit, /* visits    */
                u_int64_t tstamp,/* timestamp */
                char      *lasturl, /* lasturl */
-               int       llen,   /* lasturl len  */
                HNODEPTR  *htab)  /* ptr>next  */
 {
    HNODEPTR cptr,nptr;
    unsigned int hval;
 
    /* check if hashed */
-   hval=hash(str,len);
+   hval=hash(str);
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_hnode(str,len)) != NULL)
+      if ( (nptr=new_hnode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -178,18 +177,16 @@ int put_hnode( char      *str,  /* Hostname  */
          if (visit)
          {
             nptr->visit=(visit-1);
-			nptr->llen = llen;
-            nptr->lasturl=find_url(lasturl, &nptr->llen);
+            nptr->lasturl=find_url(lasturl);
             nptr->tstamp=tstamp;
             return 0;
          }
          else
          {
-            if (ispage(log_rec.url,log_rec.urllen))
+            if (ispage(log_rec.url))
             {
-               if (htab==sm_htab) update_entry(log_rec.url,log_rec.urllen);
-			   nptr->llen = log_rec.urllen;
-               nptr->lasturl=find_url(log_rec.url,&nptr->llen);
+               if (htab==sm_htab) update_entry(log_rec.url);
+               nptr->lasturl=find_url(log_rec.url);
                nptr->tstamp=tstamp;
                nptr->visit=1;
             }
@@ -200,7 +197,7 @@ int put_hnode( char      *str,  /* Hostname  */
    {
       while (cptr != NULL)
       {
-         if (cptr->slen == len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             if ((type==cptr->flag)||((type!=OBJ_GRP)&&(cptr->flag!=OBJ_GRP)))
             {
@@ -209,19 +206,18 @@ int put_hnode( char      *str,  /* Hostname  */
                cptr->files+=file;
                cptr->xfer +=xfer;
 
-               if (ispage(log_rec.url,log_rec.urllen))
+               if (ispage(log_rec.url))
                {
                   if ((tstamp-cptr->tstamp)>=visit_timeout)
                   {
                      cptr->visit++;
                      if (htab==sm_htab)
                      {
-                        update_exit(cptr->lasturl,cptr->llen);
-                        update_entry(log_rec.url,log_rec.urllen);
+                        update_exit(cptr->lasturl);
+                        update_entry(log_rec.url);
                      }
                   }
-				  cptr->llen = log_rec.urllen;
-                  cptr->lasturl=find_url(log_rec.url,&cptr->llen);
+                  cptr->lasturl=find_url(log_rec.url);
                   cptr->tstamp=tstamp;
                }
                return 0;
@@ -230,7 +226,7 @@ int put_hnode( char      *str,  /* Hostname  */
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_hnode(str,len)) != NULL)
+      if ( (nptr = new_hnode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -243,18 +239,16 @@ int put_hnode( char      *str,  /* Hostname  */
          if (visit)
          {
             nptr->visit = (visit-1);
-			nptr->llen = llen;
-            nptr->lasturl=find_url(lasturl,&nptr->llen);
+            nptr->lasturl=find_url(lasturl);
             nptr->tstamp= tstamp;
             return 0;
          }
          else
          {
-            if (ispage(log_rec.url,log_rec.urllen))
+            if (ispage(log_rec.url))
             {
-               if (htab==sm_htab) update_entry(log_rec.url,log_rec.urllen);
-			   nptr->llen = log_rec.urllen;
-               nptr->lasturl=find_url(log_rec.url,&nptr->llen);
+               if (htab==sm_htab) update_entry(log_rec.url);
+               nptr->lasturl=find_url(log_rec.url);
                nptr->tstamp= tstamp;
                nptr->visit=1;
             }
@@ -269,7 +263,7 @@ int put_hnode( char      *str,  /* Hostname  */
       else
       {
          /* check if it's a hidden object */
-         if ((hide_sites)||(isinlist(hidden_sites,nptr->string,nptr->slen)!=NULL))
+         if ((hide_sites)||(isinlist(hidden_sites,nptr->string)!=NULL))
            nptr->flag=OBJ_HIDE;
       }
    }
@@ -294,6 +288,7 @@ void	del_hlist(HNODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);    /* free hostname string space */
             free (aptr);            /* free hostname structure    */
             aptr = temp;
          }
@@ -306,30 +301,33 @@ void	del_hlist(HNODEPTR *htab)
 /* NEW_UNODE - URL node creation             */
 /*********************************************/
 
-UNODEPTR new_unode(char *str, int len)
+UNODEPTR new_unode(char *str)
 {
    UNODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXURLH)
+   if (strlen(str) >= MAXURLH)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_unode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_unode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXURLH-1]=0;
-	  len=MAXURLH-1;
    }
 
-   if (( newptr = malloc(sizeof(struct unode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL) return (UNODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct unode))) != NULL)
    {
-      newptr->string=(char *)(newptr+1);
-	  newptr->slen = len;
-      newptr->files = 0;
-	  strcpy(newptr->string,str);
+      newptr->string=sptr;
+      newptr->count = 0;
+      newptr->flag  = OBJ_REG;
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -337,7 +335,7 @@ UNODEPTR new_unode(char *str, int len)
 /* PUT_UNODE - insert/update URL node        */
 /*********************************************/
 
-int put_unode(char *str, int len, int type, u_int64_t count, double xfer,
+int put_unode(char *str, int type, u_int64_t count, double xfer,
               u_int64_t *ctr, u_int64_t entry, u_int64_t exit, UNODEPTR *htab)
 {
    UNODEPTR cptr,nptr;
@@ -345,12 +343,12 @@ int put_unode(char *str, int len, int type, u_int64_t count, double xfer,
 
    if (str[0]=='-') return 0;
 
-   hval = hash(str,len);
+   hval = hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_unode(str,len)) != NULL)
+      if ( (nptr=new_unode(str)) != NULL)
       {
          nptr->flag = type;
          nptr->count= count;
@@ -367,7 +365,7 @@ int put_unode(char *str, int len, int type, u_int64_t count, double xfer,
       /* hashed */
       while (cptr != NULL)
       {
-         if (cptr->slen == len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             if ((type==cptr->flag)||((type!=OBJ_GRP)&&(cptr->flag!=OBJ_GRP)))
             {
@@ -380,7 +378,7 @@ int put_unode(char *str, int len, int type, u_int64_t count, double xfer,
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_unode(str,len)) != NULL)
+      if ( (nptr = new_unode(str)) != NULL)
       {
          nptr->flag = type;
          nptr->count= count;
@@ -395,7 +393,7 @@ int put_unode(char *str, int len, int type, u_int64_t count, double xfer,
    if (nptr!=NULL)
    {
       if (type==OBJ_GRP) nptr->flag=OBJ_GRP;
-      else if (isinlist(hidden_urls,nptr->string,nptr->slen)!=NULL)
+      else if (isinlist(hidden_urls,nptr->string)!=NULL)
                          nptr->flag=OBJ_HIDE;
    }
    return nptr==NULL;
@@ -419,6 +417,7 @@ void	del_ulist(UNODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);  /* free up URL string memory */
             free (aptr);          /* free up URL struct node   */
             aptr = temp;
          }
@@ -431,31 +430,33 @@ void	del_ulist(UNODEPTR *htab)
 /* NEW_RNODE - Referrer node creation        */
 /*********************************************/
 
-RNODEPTR new_rnode(char *str,int len)
+RNODEPTR new_rnode(char *str)
 {
    RNODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXREFH)
+   if (strlen(str) >= MAXREFH)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_rnode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_rnode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXREFH-1]=0;
-	  len=MAXREFH-1;
    }
 
-   if (( newptr = malloc(sizeof(struct rnode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (RNODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct rnode))) != NULL)
    {
-      newptr->string= (char *)(newptr+1);;
-	  newptr->slen  = len;
+      newptr->string= sptr;
       newptr->count = 1;
       newptr->flag  = OBJ_REG;
-	  strcpy(newptr->string,str);
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -463,23 +464,20 @@ RNODEPTR new_rnode(char *str,int len)
 /* PUT_RNODE - insert/update referrer node   */
 /*********************************************/
 
-int put_rnode(char *str, int len, int type, u_int64_t count,
+int put_rnode(char *str, int type, u_int64_t count,
               u_int64_t *ctr, RNODEPTR *htab)
 {
    RNODEPTR cptr,nptr;
    unsigned int hval;
 
-   if (str[0]=='-') {
-     strcpy(str,"- (Direct Request)");
-	 len=sizeof("- (Direct Request)")-1;
-   }
+   if (str[0]=='-') strcpy(str,"- (Direct Request)");
 
-   hval = hash(str,len);
+   hval = hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_rnode(str,len)) != NULL)
+      if ( (nptr=new_rnode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -492,7 +490,7 @@ int put_rnode(char *str, int len, int type, u_int64_t count,
    {
       while (cptr != NULL)
       {
-         if (cptr->slen == len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             if ((type==cptr->flag)||((type!=OBJ_GRP)&&(cptr->flag!=OBJ_GRP)))
             {
@@ -504,7 +502,7 @@ int put_rnode(char *str, int len, int type, u_int64_t count,
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_rnode(str,len)) != NULL)
+      if ( (nptr = new_rnode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -516,7 +514,7 @@ int put_rnode(char *str, int len, int type, u_int64_t count,
    if (nptr!=NULL)
    {
       if (type==OBJ_GRP) nptr->flag=OBJ_GRP;
-      else if (isinlist(hidden_refs,nptr->string,nptr->slen)!=NULL)
+      else if (isinlist(hidden_refs,nptr->string)!=NULL)
                          nptr->flag=OBJ_HIDE;
    }
    return nptr==NULL;
@@ -540,6 +538,7 @@ void	del_rlist(RNODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);
             free (aptr);
             aptr = temp;
          }
@@ -552,31 +551,33 @@ void	del_rlist(RNODEPTR *htab)
 /* NEW_ANODE - User Agent node creation      */
 /*********************************************/
 
-ANODEPTR new_anode(char *str,int len)
+ANODEPTR new_anode(char *str)
 {
    ANODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXAGENT)
+   if (strlen(str) >= MAXAGENT)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_anode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_anode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXAGENT-1]=0;
-	  len=MAXAGENT-1;
    }
 
-   if (( newptr = malloc(sizeof(struct anode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (ANODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct anode))) != NULL)
    {
-      newptr->string= (char *)(newptr+1);;
-	  newptr->slen  = len;
+      newptr->string= sptr;
       newptr->count = 1;
       newptr->flag  = OBJ_REG;
-	  strcpy(newptr->string,str);
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -584,7 +585,7 @@ ANODEPTR new_anode(char *str,int len)
 /* PUT_ANODE - insert/update user agent node */
 /*********************************************/
 
-int put_anode(char *str, int len, int type, u_int64_t count,
+int put_anode(char *str, int type, u_int64_t count,
               u_int64_t *ctr, ANODEPTR *htab)
 {
    ANODEPTR cptr,nptr;
@@ -592,12 +593,12 @@ int put_anode(char *str, int len, int type, u_int64_t count,
 
    if (str[0]=='-') return 0;     /* skip bad user agents */
 
-   hval = hash(str,len);
+   hval = hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_anode(str,len)) != NULL)
+      if ( (nptr=new_anode(str)) != NULL)
       {
          nptr->flag = type;
          nptr->count= count;
@@ -611,7 +612,7 @@ int put_anode(char *str, int len, int type, u_int64_t count,
       /* hashed */
       while (cptr != NULL)
       {
-         if (cptr->slen == len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             if ((type==cptr->flag)||((type!=OBJ_GRP)&&(cptr->flag!=OBJ_GRP)))
             {
@@ -623,7 +624,7 @@ int put_anode(char *str, int len, int type, u_int64_t count,
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_anode(str,len)) != NULL)
+      if ( (nptr = new_anode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -633,7 +634,7 @@ int put_anode(char *str, int len, int type, u_int64_t count,
       }
    }
    if (type==OBJ_GRP) nptr->flag=OBJ_GRP;
-   else if (isinlist(hidden_agents,nptr->string,nptr->slen)!=NULL)
+   else if (isinlist(hidden_agents,nptr->string)!=NULL)
                       nptr->flag=OBJ_HIDE;
    return nptr==NULL;
 }
@@ -656,6 +657,7 @@ void	del_alist(ANODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);
             free (aptr);
             aptr = temp;
          }
@@ -668,30 +670,32 @@ void	del_alist(ANODEPTR *htab)
 /* NEW_SNODE - Search str node creation      */
 /*********************************************/
 
-SNODEPTR new_snode(char *str,int len)
+SNODEPTR new_snode(char *str)
 {
    SNODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXSRCHH)
+   if (strlen(str) >= MAXSRCHH)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_snode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_snode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXSRCHH-1]=0;
-	  len=MAXSRCHH-1;
    }
 
-   if (( newptr = malloc(sizeof(struct snode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (SNODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct snode))) != NULL)
    {
-      newptr->string= (char *)(newptr+1);;
-	  newptr->slen  = len;
+      newptr->string= sptr;
       newptr->count = 1;
-	  strcpy(newptr->string,str);
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -699,19 +703,19 @@ SNODEPTR new_snode(char *str,int len)
 /* PUT_SNODE - insert/update search str node */
 /*********************************************/
 
-int put_snode(char *str, int len, u_int64_t count, SNODEPTR *htab)
+int put_snode(char *str, u_int64_t count, SNODEPTR *htab)
 {
    SNODEPTR cptr,nptr;
    unsigned int hval;
 
    if (str[0]==0 || str[0]==' ') return 0;     /* skip bad search strs */
 
-   hval=hash(str,len);
+   hval=hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_snode(str,len)) != NULL)
+      if ( (nptr=new_snode(str)) != NULL)
       {
          nptr->count = count;
          nptr->next = NULL;
@@ -723,7 +727,7 @@ int put_snode(char *str, int len, u_int64_t count, SNODEPTR *htab)
       /* hashed */
       while (cptr != NULL)
       {
-         if (cptr->slen==len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             /* found... bump counter */
             cptr->count+=count;
@@ -732,7 +736,7 @@ int put_snode(char *str, int len, u_int64_t count, SNODEPTR *htab)
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_snode(str,len)) != NULL)
+      if ( (nptr = new_snode(str)) != NULL)
       {
          nptr->count = count;
          nptr->next  = htab[hval];
@@ -760,6 +764,7 @@ void	del_slist(SNODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);
             free (aptr);
             aptr = temp;
          }
@@ -772,31 +777,33 @@ void	del_slist(SNODEPTR *htab)
 /* NEW_INODE - create ident (username) node  */
 /*********************************************/
 
-INODEPTR new_inode(char *str,int len)
+INODEPTR new_inode(char *str)
 {
    INODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXIDENT)
+   if (strlen(str) >= MAXIDENT)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_inode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_inode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXIDENT-1]=0;
-	  len=MAXIDENT-1;
    }
 
-   if (( newptr = malloc(sizeof(struct inode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (INODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct inode))) != NULL)
    {
-      newptr->string    =(char *)(newptr+1);;
-	  newptr->slen      =len;
+      newptr->string    =sptr;
       newptr->visit     =1;
       newptr->tstamp    =0;
-	  strcpy(newptr->string,str);
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -805,7 +812,6 @@ INODEPTR new_inode(char *str,int len)
 /*********************************************/
 
 int put_inode( char      *str,  /* ident str */
-               int       len,   /* str len   */
                int       type,  /* obj type  */
                u_int64_t count, /* hit count */
                u_int64_t file,  /* File flag */
@@ -820,12 +826,12 @@ int put_inode( char      *str,  /* ident str */
 
    if ((str[0]=='-') || (str[0]==0)) return 0;  /* skip if no username */
 
-   hval = hash(str,len);
+   hval = hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_inode(str,len)) != NULL)
+      if ( (nptr=new_inode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -843,7 +849,7 @@ int put_inode( char      *str,  /* ident str */
          }
          else
          {
-            if (ispage(log_rec.url,log_rec.urllen)) nptr->tstamp=tstamp;
+            if (ispage(log_rec.url)) nptr->tstamp=tstamp;
          }
       }
    }
@@ -852,7 +858,7 @@ int put_inode( char      *str,  /* ident str */
       /* hashed */
       while (cptr != NULL)
       {
-         if (cptr->slen==len && strcmp(cptr->string,str)==0)
+         if (strcmp(cptr->string,str)==0)
          {
             if ((type==cptr->flag)||((type!=OBJ_GRP)&&(cptr->flag!=OBJ_GRP)))
             {
@@ -861,7 +867,7 @@ int put_inode( char      *str,  /* ident str */
                cptr->files+=file;
                cptr->xfer +=xfer;
 
-               if (ispage(log_rec.url,log_rec.urllen))
+               if (ispage(log_rec.url))
                {
                   if ((tstamp-cptr->tstamp)>=visit_timeout)
                      cptr->visit++;
@@ -873,7 +879,7 @@ int put_inode( char      *str,  /* ident str */
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_inode(str,len)) != NULL)
+      if ( (nptr = new_inode(str)) != NULL)
       {
          nptr->flag  = type;
          nptr->count = count;
@@ -891,7 +897,7 @@ int put_inode( char      *str,  /* ident str */
          }
          else
          {
-            if (ispage(log_rec.url,log_rec.urllen)) nptr->tstamp= tstamp;
+            if (ispage(log_rec.url)) nptr->tstamp= tstamp;
          }
       }
    }
@@ -903,7 +909,7 @@ int put_inode( char      *str,  /* ident str */
       else
       {
          /* check if it's a hidden object */
-         if (isinlist(hidden_users,nptr->string,nptr->slen)!=NULL)
+         if (isinlist(hidden_users,nptr->string)!=NULL)
            nptr->flag=OBJ_HIDE;
       }
    }
@@ -928,6 +934,7 @@ void	del_ilist(INODEPTR *htab)
          while (aptr != NULL)
          {
             temp = aptr->next;
+            free (aptr->string);    /* free ident string space */
             free (aptr);            /* free ident structure    */
             aptr = temp;
          }
@@ -942,29 +949,31 @@ void	del_ilist(INODEPTR *htab)
 /* NEW_DNODE - DNS resolver node creation    */
 /*********************************************/
 
-DNODEPTR new_dnode(char *str,int len)
+DNODEPTR new_dnode(char *str)
 {
    DNODEPTR newptr;
+   char     *sptr;
 
-   if (len >= MAXHOST)
+   if (strlen(str) >= MAXHOST)
    {
       if (verbose)
       {
-         fprintf(stderr,"[new_dnode] %s (%d)",msg_big_one,len);
+         fprintf(stderr,"[new_dnode] %s (%d)",msg_big_one,strlen(str));
          if (debug_mode)
             fprintf(stderr,":\n--> %s",str);
          fprintf(stderr,"\n");
       }
       str[MAXHOST-1]=0;
-	  len=MAXHOST-1;
    }
 
-   if (( newptr = malloc(sizeof(struct dnode)+len+1)) != NULL)
+   if ( (sptr=malloc(strlen(str)+1))==NULL ) return (DNODEPTR)NULL;
+   strcpy(sptr,str);
+
+   if (( newptr = malloc(sizeof(struct dnode))) != NULL)
    {
-      newptr->string= (char *)(newptr+1);;
-      newptr->slen= len;
-	  strcpy(newptr->string,str);
+      newptr->string= sptr;
    }
+   else free(sptr);
    return newptr;
 }
 
@@ -972,19 +981,19 @@ DNODEPTR new_dnode(char *str,int len)
 /* PUT_DNODE - insert/update dns host node   */
 /*********************************************/
 
-int put_dnode(char *str, int slen, void *addr, int len, DNODEPTR *htab)
+int put_dnode(char *str, void *addr, int len, DNODEPTR *htab)
 {
    DNODEPTR cptr,nptr;
    unsigned int hval;
 
    if (str[0]==0 || str[0]==' ') return 0;     /* skip bad hostnames */
 
-   hval = hash(str,slen);
+   hval = hash(str);
    /* check if hashed */
    if ( (cptr = htab[hval]) == NULL)
    {
       /* not hashed */
-      if ( (nptr=new_dnode(str,slen)) != NULL)
+      if ( (nptr=new_dnode(str)) != NULL)
       {
          if (addr) memcpy(&nptr->addr, addr, len);
             else   memset(&nptr->addr, 0, sizeof(struct sockaddr_storage));
@@ -998,11 +1007,11 @@ int put_dnode(char *str, int slen, void *addr, int len, DNODEPTR *htab)
       /* hashed */
       while (cptr != NULL)
       {
-         if (cptr->slen==slen && strcmp(cptr->string,str)==0) return 0;
+         if (strcmp(cptr->string,str)==0) return 0;
          cptr = cptr->next;
       }
       /* not found... */
-      if ( (nptr = new_dnode(str,slen)) != NULL)
+      if ( (nptr = new_dnode(str)) != NULL)
       {
          if (addr) memcpy(&nptr->addr, addr, len);
             else   memset(&nptr->addr, 0, sizeof(struct sockaddr_storage));
@@ -1032,6 +1041,7 @@ void	del_dlist(DNODEPTR *htab)
          while (dptr != NULL)
          {
             temp = dptr->next;
+            free (dptr->string);
             free (dptr);
             dptr = temp;
          }
@@ -1046,22 +1056,19 @@ void	del_dlist(DNODEPTR *htab)
 /* FIND_URL - Find URL in hash table         */
 /*********************************************/
 
-char *find_url(char *str,int *len)
+char *find_url(char *str)
 {
    UNODEPTR cptr;
 
-   if ( (cptr=um_htab[hash(str,*len)]) != NULL)
+   if ( (cptr=um_htab[hash(str)]) != NULL)
    {
       while (cptr != NULL)
       {
-         if (cptr->slen== *len && strcmp(cptr->string,str)==0) {
-		    *len = cptr->slen;
+         if (strcmp(cptr->string,str)==0)
             return cptr->string;
-		 }
          cptr = cptr->next;
       }
    }
-   *len = 0;
    return blank_str;   /* shouldn't get here */
 }
 
@@ -1069,17 +1076,17 @@ char *find_url(char *str,int *len)
 /* UPDATE_ENTRY - update entry page total    */
 /*********************************************/
 
-void update_entry(char *str,int len)
+void update_entry(char *str)
 {
    UNODEPTR uptr;
 
    if (str==NULL) return;
-   if ( (uptr = um_htab[hash(str,len)]) == NULL) return;
+   if ( (uptr = um_htab[hash(str)]) == NULL) return;
    else
    {
       while (uptr != NULL)
       {
-         if (uptr->slen==len && strcmp(uptr->string,str)==0)
+         if (strcmp(uptr->string,str)==0)
          {
             if (uptr->flag!=OBJ_GRP)
             {
@@ -1096,17 +1103,17 @@ void update_entry(char *str,int len)
 /* UPDATE_EXIT  - update exit page total     */
 /*********************************************/
 
-void update_exit(char *str,int len)
+void update_exit(char *str)
 {
    UNODEPTR uptr;
 
    if (str==NULL) return;
-   if ( (uptr = um_htab[hash(str,len)]) == NULL) return;
+   if ( (uptr = um_htab[hash(str)]) == NULL) return;
    else
    {
       while (uptr != NULL)
       {
-         if (uptr->slen == len && strcmp(uptr->string,str)==0)
+         if (strcmp(uptr->string,str)==0)
          {
             if (uptr->flag!=OBJ_GRP)
             {
@@ -1136,7 +1143,7 @@ void month_update_exit(u_int64_t tstamp)
          if (nptr->flag!=OBJ_GRP)
          {
             if ((tstamp-nptr->tstamp)>=visit_timeout)
-               update_exit(nptr->lasturl,nptr->llen);
+               update_exit(nptr->lasturl);
          }
          nptr=nptr->next;
       }
@@ -1196,8 +1203,9 @@ unsigned int hash(char *str)
                        +(uint32_t)(((const uint8_t *)(d))[0]) )
 #endif
 
-unsigned int hash(char *str,int len)
+unsigned int hash(char *str)
 {
+   int len=strlen(str);
    uint32_t hash = len, tmp;
    int rem;
 

@@ -1713,8 +1713,8 @@ void get_config(char *fname)
         case 26: add_nlist(value,&ignored_urls);   break; /* IgnoreURL      */
         case 27: add_nlist(value,&ignored_refs);   break; /* IgnoreReferrer */
         case 28: add_nlist(value,&ignored_agents); break; /* IgnoreAgent    */
-        case 29: if (tolower(value[0])=='y')
-                    verbose=0;                     break; /* ReallyQuiet    */
+        case 29: if (tolower(value[0])=='y') { verbose=0; }
+													break; /* ReallyQuiet    */
         case 30: local_time=
                     (tolower(value[0])=='y')?0:1;  break; /* GMTTime        */
         case 31: add_glist(value,&group_urls);     break; /* GroupURL       */
@@ -2152,7 +2152,14 @@ void srch_string(char *ptr)
       if ((cp1=(unsigned char *)strstr(ptr,srch))==NULL) return;
    }
    cp2=(unsigned char *)tmpbuf;
-   while (*cp1!='=' && *cp1!=0) cp1++; if (*cp1!=0) cp1++;
+   while (*cp1!='=' && *cp1!=0) 
+   {
+	   cp1++;
+   }
+   if (*cp1!=0)
+   {
+	   cp1++;
+   }
    while (*cp1!='&' && *cp1!=0)
    {
       if (*cp1=='"' || *cp1==',' || *cp1=='?')

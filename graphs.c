@@ -223,7 +223,7 @@ int year_graph6x(char *fname, char *title, struct hist_rec data[HISTSIZE])
       if (data[i].page  > maxval) maxval = data[i].page;
    }
    if (maxval <= 0) maxval = 1;
-   sprintf(maxvaltxt, "%llu", maxval);
+   sprintf(maxvaltxt, "%lu", maxval);
    gdImageStringUp(im,gdFontSmall,6,26+(strlen(maxvaltxt)*6),
                    (unsigned char *)maxvaltxt,black);
 
@@ -270,7 +270,7 @@ int year_graph6x(char *fname, char *title, struct hist_rec data[HISTSIZE])
        if (data[i].visit > maxval) maxval = data[i].visit;
    }
    if (maxval <= 0) maxval = 1;
-   sprintf(maxvaltxt, "%llu", maxval);
+   sprintf(maxvaltxt, "%lu", maxval);
    gdImageStringUp(im, gdFontSmall,493,26+(strlen(maxvaltxt)*6),
                    (unsigned char *)maxvaltxt, black);
 
@@ -418,7 +418,7 @@ int month_graph6(     char  *fname,        /* filename           */
        if (data5[i] > maxval) maxval = data5[i];
    }
    if (maxval <= 0) maxval = 1;
-   sprintf(maxvaltxt, "%llu", maxval);
+   sprintf(maxvaltxt, "%lu", maxval);
    gdImageStringUp(im, gdFontSmall,8,26+(strlen(maxvaltxt)*6),
                    (unsigned char *)maxvaltxt,black);
 
@@ -510,7 +510,7 @@ int month_graph6(     char  *fname,        /* filename           */
       if (data6[i]>maxval) maxval = data6[i];
    }
    if (maxval <= 0) maxval = 1;
-   sprintf(maxvaltxt, "%llu", maxval);
+   sprintf(maxvaltxt, "%lu", maxval);
    gdImageStringUp(im, gdFontSmall,8,180+(strlen(maxvaltxt)*6),
                    (unsigned char *)maxvaltxt, black);
    
@@ -620,7 +620,7 @@ int day_graph3(     char  *fname,
       if (data3[i] > maxval) maxval = data3[i];
    }
    if (maxval <= 0) maxval = 1;
-   sprintf(maxvaltxt, "%llu", maxval);
+   sprintf(maxvaltxt, "%lu", maxval);
    gdImageStringUp(im, gdFontSmall, 8, 26+(strlen(maxvaltxt)*6),
                    (unsigned char *)maxvaltxt, black);
    

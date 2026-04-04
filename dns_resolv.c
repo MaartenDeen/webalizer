@@ -881,7 +881,11 @@ char *geodb_get_cc(DB *db, char *ip, char *buf)
    if (!iptype(ip, addr)) return buf;
 
    /* kludge for IPv6 mapped IPv4 */
-   if (addr[0]==0 && addr[1]==0 && addr[2]==0) { addr[10]=0; addr[11]=0; }
+   if (addr[0]==0 && addr[1]==0 && addr[2]==0)
+    {
+       addr[10]=0; 
+       addr[11]=0;
+    }
 
    /* kludge for IPv6 6to4 (RFC3056) */
    if (addr[0]==0x20 && addr[1]==0x02)
@@ -915,8 +919,8 @@ void geodb_close(DB *db)
 
 int iptype(char *ip, unsigned char *buf)
 {
-   if (inet_pton(AF_INET6, ip, buf)>0)     return 2;
-   if (inet_pton(AF_INET,  ip, buf+12)>0)  return 1;
+   if (inet_pton(AF_INET6, ip, buf)>0)    return 2;
+   if (inet_pton(AF_INET,  ip, buf+12)>0) return 1;
    else return 0;
 }
 

@@ -1163,7 +1163,7 @@ int main(int argc, char *argv[])
           case RC_SEEOTHER:         i=IDX_SEEOTHER;         break;
           case RC_NOMOD:            i=IDX_NOMOD;            break;
           case RC_USEPROXY:         i=IDX_USEPROXY;         break;
- 	  case RC_MOVEDTEMPORARILY: i=IDX_MOVEDTEMPORARILY; break;
+          case RC_MOVEDTEMPORARILY: i=IDX_MOVEDTEMPORARILY; break;
           case RC_BAD:              i=IDX_BAD;              break;
           case RC_UNAUTH:           i=IDX_UNAUTH;           break;
           case RC_PAYMENTREQ:       i=IDX_PAYMENTREQ;       break;
@@ -1180,8 +1180,8 @@ int main(int argc, char *argv[])
           case RC_REQENTTOOLARGE:   i=IDX_REQENTTOOLARGE;   break;
           case RC_REQURITOOLARGE:   i=IDX_REQURITOOLARGE;   break;
           case RC_UNSUPMEDIATYPE:   i=IDX_UNSUPMEDIATYPE;   break;
-	  case RC_RNGNOTSATISFIABLE:i=IDX_RNGNOTSATISFIABLE;break;
-	  case RC_EXPECTATIONFAILED:i=IDX_EXPECTATIONFAILED;break;
+          case RC_RNGNOTSATISFIABLE:i=IDX_RNGNOTSATISFIABLE;break;
+          case RC_EXPECTATIONFAILED:i=IDX_EXPECTATIONFAILED;break;
           case RC_SERVERERR:        i=IDX_SERVERERR;        break;
           case RC_NOTIMPLEMENTED:   i=IDX_NOTIMPLEMENTED;   break;
           case RC_BADGATEWAY:       i=IDX_BADGATEWAY;       break;
